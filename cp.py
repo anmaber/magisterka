@@ -4,57 +4,78 @@ import numpy as np
 from IPython.display import display
 import os
 import time
+import pulp
 
-def readAvailibility():
-    availbility = {}
-    for file in os.listdir('dyspo'):
-        data = pd.read_excel('dyspo/'+file, header=0,index_col=0)
-        availbility.update({file[:-4] : np.array(data)}) 
-        print(availbility)
-    return availbility
-
-def saveSchedule(schedule):
-
-    numOfShifts = len(schedule[0])
-    colNames = []
-    for i in range(numOfShifts):
-        colNames.append("Zmiana " + str(i))
+class TestRunner:
+    def __init__(self, numOfRepetitions, createSchedule, destination):
+        self.numOfRepetitions = numOfRepetitions
+        self.createSchedule = createSchedule
+        self.destination = "results/" + destination + "/grafik.xls"
     
-    df = pd.DataFrame(schedule, columns = colNames)
-    df.to_excel("grafik/grafik.xls")
+    def printTestRunner(self):
+        print("TestRunner num of repetitions: " + str(self.numOfRepetitions))
 
-def countEmptyShifts(schedule):
-    numOfEmptyShifts = 0
-    for day in schedule:
-        for shift in day:
-            if shift == None:
-                numOfEmptyShifts +=1
-    return numOfEmptyShifts
+    def readAvailibility(self):
+        availbility = {}
+        for file in os.listdir('input/enough/dataSet1'):
+            data = pd.read_excel('input/enough/dataSet1/'+file, header=0,index_col=0)
+            availbility.update({file[:-4] : np.array(data)}) 
+            print(availbility)
+        return availbility
 
-def getNumOfDaysWithAvailbility(personalAvailbility):
-    numOfDaysWithAvailbility = 0
-    for day in personalAvailbility:
-        for request in day:
-            if request != 0:
-                numOfDaysWithAvailbility +=1
-                break
-    return numOfDaysWithAvailbility
+    def saveSchedule(self, schedule):
+
+        numOfShifts = len(schedule[0])
+        colNames = []
+        for i in range(numOfShifts):
+            colNames.append("Zmiana " + str(i))
+        
+        df = pd.DataFrame(schedule, columns = colNames)
+        df.to_excel(self.destination)
+
+    def countEmptyShifts(self, schedule):
+        numOfEmptyShifts = 0
+        for day in schedule:
+            for shift in day:
+                if shift == None:
+                    numOfEmptyShifts +=1
+        return numOfEmptyShifts
+
+    def getNumOfDaysWithAvailbility(self, personalAvailbility):
+        numOfDaysWithAvailbility = 0
+        for day in personalAvailbility:
+            for request in day:
+                if request != 0:
+                    numOfDaysWithAvailbility +=1
+                    break
+        return numOfDaysWithAvailbility
 
 
-def getDifferenceAvailbilityAndSchedule(availbility, schedule):
-    numOfWorkers = len(availbility)
-    allShiftsRequests = list(availbility.values())
-    workersNames = list(availbility.keys())
+    def getDifferenceAvailbilityAndSchedule(self, availbility, schedule):
+        numOfWorkers = len(availbility)
+        allShiftsRequests = list(availbility.values())
+        workersNames = list(availbility.keys())
 
-    diff = {}
-    for name in workersNames:
-        diff[name] = getNumOfDaysWithAvailbility(availbility[name])
+        diff = {}
+        for name in workersNames:
+            diff[name] = self.getNumOfDaysWithAvailbility(availbility[name])
 
-    for day in schedule:
-        for shift in day:
-            if shift != None:
-                diff[shift] -= 1
-    print(diff)
+        for day in schedule:
+            for shift in day:
+                if shift != None:
+                    diff[shift] -= 1
+        print(diff)
+    
+    def runTest(self):
+        for i in range(self.numOfRepetitions):
+            availbility = self.readAvailibility()
+            start = time.time()
+            schedule = self.createSchedule(availbility)
+            end = time.time()
+            duration = end - start
+            print("elapsed time: " + str(duration) + " Num of empty shifts: " + str(self.countEmptyShifts(schedule)))
+            self.saveSchedule(schedule)
+            self.getDifferenceAvailbilityAndSchedule(availbility,schedule)
 
 
 def createScheduleWithConstraintProgramming(availability):
@@ -150,16 +171,70 @@ def createScheduleWithConstraintProgramming(availability):
     
     return solution
 
+def createScheduleWithLinearProgramming(availability):
+    print("lp")
+    numOfWorkers = len(availability)
+    allShiftsRequests = list(availability.values())
+    workersNames = list(availability.keys())
+    numOfShifts = len(allShiftsRequests[0][0])
+    numOfDays = len(allShiftsRequests[0])
+    print('num of woekers: ', numOfWorkers, ' numOfshifts ', numOfShifts, ' numOfDays ', numOfDays)
+    allWorkers = range(numOfWorkers)
+    allShifts = range(numOfShifts)
+    allDays = range(numOfDays)
+
+    var = pulp.LpVariable.dicts('VAR', (range(numOfWorkers), range(numOfDays), range(numOfShifts)), 0, 1, 'Binary')
+    
+    obj = None
+    for worker in allWorkers:
+        for day in allDays:
+            for shift in allShifts:
+                obj += allShiftsRequests[worker][day][shift] * var[worker][day][shift]
+
+    problem = pulp.LpProblem('shift', pulp.LpMaximize)
+
+    problem += obj
+
+    for day in allDays:
+        for shift in allShifts:
+            c = None
+            for worker in allWorkers:
+                c += var[worker][day][shift]
+            problem += c <= 1
+
+    for worker in allWorkers:
+        for day in allDays:
+            c = None
+            for shift in allShifts:
+                c+= var[worker][day][shift]
+            problem += c <= 1  
+
+    status = problem.solve()
+    print("Status", pulp.LpStatus[status])
+
+    solution = []
+
+    for d in allDays:
+        dayShifts = [None] * numOfShifts
+        for shift in allShifts:
+            for worker in allWorkers:
+                if var[worker][d][shift].value() > 0.0:
+                    dayShifts[shift] = workersNames[worker]
+        solution.append(dayShifts)
+
+    print(solution)
+    return solution
 
 def main():
-    availbility = readAvailibility()
-    start = time.time()
-    schedule = createScheduleWithConstraintProgramming(availbility)
-    end = time.time()
-    duration = end - start
-    print("elapsed time: " + str(duration) + " Num of empty shifts: " + str(countEmptyShifts(schedule)))
-    saveSchedule(schedule)
-    getDifferenceAvailbilityAndSchedule(availbility,schedule)
+    
+    t = TestRunner(1, createScheduleWithConstraintProgramming, "cp")
+    t.printTestRunner()
+    t.runTest()
+
+    t2 = TestRunner(1, createScheduleWithLinearProgramming, "lp")
+    t2.printTestRunner()
+    t2.runTest()
+
    
 if __name__ == '__main__':
     main()
