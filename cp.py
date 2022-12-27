@@ -2,6 +2,7 @@ from ortools.sat.python import cp_model
 import pandas as pd
 import numpy as np
 from IPython.display import display
+from tabu import tabuSearch
 import os
 import time
 import pulp
@@ -13,14 +14,13 @@ class TestRunner:
         self.destination = "results/" + destination + "/grafik.xls"
     
     def printTestRunner(self):
-        print("TestRunner num of repetitions: " + str(self.numOfRepetitions))
+        print("TestRunner num of repetitions: " + str(self.numOfRepetitions)+" algo: " + self.destination)
 
     def readAvailibility(self):
         availbility = {}
         for file in os.listdir('input/enough/dataSet1'):
             data = pd.read_excel('input/enough/dataSet1/'+file, header=0,index_col=0)
             availbility.update({file[:-4] : np.array(data)}) 
-            print(availbility)
         return availbility
 
     def saveSchedule(self, schedule):
@@ -139,9 +139,9 @@ def createScheduleWithConstraintProgramming(availability):
     solution = []
 
     if status == cp_model.OPTIMAL:
-        print('Solution:')
+        # print('Solution:')
         for d in allDays:
-            print('Day', d)
+            # print('Day', d)
             dayShifts = [None] * numOfShifts
             for shift in allShifts:
                 for worker in allWorkers:
@@ -149,25 +149,25 @@ def createScheduleWithConstraintProgramming(availability):
                         dayShifts[shift] = workersNames[worker]
             solution.append(dayShifts)
                     
-            for n in allWorkers:
-                for s in allShifts:
-                    if solver.Value(shifts[(n, d, s)]) == 1:
-                        if allShiftsRequests[n][d][s] == 1:
-                            print('Nurse', n+1, 'works shift', s, '(requested).')
-                        else:
-                            print('Nurse', n+1, 'works shift', s,
-                                  '(not requested).')
-            print()
+            # for n in allWorkers:
+            #     for s in allShifts:
+            #         if solver.Value(shifts[(n, d, s)]) == 1:
+            #             if allShiftsRequests[n][d][s] == 1:
+            #                 print('Nurse', n+1, 'works shift', s, '(requested).')
+            #             else:
+            #                 print('Nurse', n+1, 'works shift', s,
+            #                       '(not requested).')
+            # print()
 
     else:
         print('No optimal solution found !')
 
 
     # Statistics.
-    print('\nStatistics')
-    print('  - conflicts: %i' % solver.NumConflicts())
-    print('  - branches : %i' % solver.NumBranches())
-    print('  - wall time: %f s' % solver.WallTime())
+    # print('\nStatistics')
+    # print('  - conflicts: %i' % solver.NumConflicts())
+    # print('  - branches : %i' % solver.NumBranches())
+    # print('  - wall time: %f s' % solver.WallTime())
     
     return solution
 
@@ -222,7 +222,7 @@ def createScheduleWithLinearProgramming(availability):
                     dayShifts[shift] = workersNames[worker]
         solution.append(dayShifts)
 
-    print(solution)
+    # print(solution)
     return solution
 
 def main():
@@ -235,6 +235,9 @@ def main():
     t2.printTestRunner()
     t2.runTest()
 
+    t3 = TestRunner(1, tabuSearch, "tabu")
+    t3.printTestRunner()
+    t3.runTest()
    
 if __name__ == '__main__':
     main()
