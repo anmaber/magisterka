@@ -53,11 +53,19 @@ class ExampleSchedulesGenerator:
         return withEmptyShifts    
 
     def generateSchedules(self):
+        path = "ExampleSchedules/" + "P" + str(len(self.workers)) +  "D" + str(self.numOfDays)
+        emptyShiftsPath = "ExampleScheduleswithEmptyShifts/"+ "P" + str(len(self.workers)) +  "D" + str(self.numOfDays)
+        if not os.path.exists(path):
+                os.makedirs(path)
+        
+        if not os.path.exists(emptyShiftsPath):
+                os.makedirs(emptyShiftsPath)
+
         for i in range(self.numOfSchedules):
             schedule = self.generateSchedule()
-            self.saveToExcel(schedule, i, "ExampleSchedules")
+            self.saveToExcel(schedule, i, path)
             withEmptyShifts = self.generateScheduleWithEmptyShifts(schedule)
-            self.saveToExcel(withEmptyShifts, i,"ExampleScheduleswithEmptyShifts" )
+            self.saveToExcel(withEmptyShifts, i, emptyShiftsPath )
 
 class AvailbilityGenerator():
     def __init__(self) -> None:
@@ -139,18 +147,34 @@ class AvailbilityGenerator():
         return []
 
     def generateAvailbilitySets(self):
-        for option in self.options:
-            if option == "tooFew":
-                self.generateAvailbility(0, 1,"ExampleAvalbility/"+option, "ExampleScheduleswithEmptyShifts")
-            elif option == "enough" :
-                self.generateAvailbility(0,2,"ExampleAvalbility/"+option)
-            else:
-                self.generateAvailbility(1,2,"ExampleAvalbility/"+option)
+        for dir in os.listdir("ExampleSchedules"):
+            for option in self.options:
+                if option == "tooFew":
+                    self.generateAvailbility(0, 1,"ExampleAvalbility/"+dir+ "/"+option, "ExampleScheduleswithEmptyShifts/"+dir)
+                elif option == "enough" :
+                    self.generateAvailbility(0,2,"ExampleAvalbility/"+dir+ "/"+option, "ExampleSchedules/"+dir)
+                else:
+                    self.generateAvailbility(1,2,"ExampleAvalbility/"+dir+ "/"+option,"ExampleSchedules/"+dir)
 
 def main():
-    workers= ["w1", "w2","w3", "w4","w5", "w6", "w7" ]
-    generator = ExampleSchedulesGenerator(3,workers)
+    workers= ["w1", "w2","w3", "w4","w5", "w6", "w7"]
+    generator = ExampleSchedulesGenerator(3,workers, 3, 30)
     generator.generateSchedules()
+
+    generator2 = ExampleSchedulesGenerator(3,workers, 3, 14)
+    generator2.generateSchedules()
+
+    generator3 = ExampleSchedulesGenerator(3,workers, 3, 7)
+    generator3.generateSchedules()
+
+    workers2= ["w1", "w2","w3", "w4"]
+    workers3= ["w1", "w2","w3", "w4","w5", "w6", "w7","w8", "w9", "w10"]
+
+    generator4 = ExampleSchedulesGenerator(3,workers2, 3, 14)
+    generator4.generateSchedules()
+
+    generator5 = ExampleSchedulesGenerator(3,workers3, 3, 14)
+    generator5.generateSchedules()
 
     aGen = AvailbilityGenerator()
     aGen.generateAvailbilitySets()

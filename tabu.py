@@ -104,20 +104,23 @@ def tabuSearch(availbility):
     tabuTenure = 6
     tabuList = {}
     iterations = 0
-    maxIterations = 50
+    maxIterations = 200
 
     while iterations < maxIterations:
         neighbours = generateNeighbourhood(currentSolution, convertedAvailbility)
         tabuSolutions = tabuList.keys()
         neighbours = list(set(neighbours) - set(tabuSolutions)) #pamietaj o mozliwosci wykorzystania rozwiazania z tabu listy
         neighbours = sorted(neighbours, key = lambda item : item[3])
+        if not neighbours:
+            print("neighbours are empty, iterations done: " + str(iterations))
+            break
         bestMove = neighbours[0]
         currentSolutionDayValue = evaluateDay(currentSolution[bestMove[0]])
         currentSolution[bestMove[0]][bestMove[1]] = bestMove[2]
         currentSolutionValue = currentSolutionValue - currentSolutionDayValue + bestMove[3]
         if currentSolutionValue < bestSolutionValue:
             bestSolution = copy.deepcopy(currentSolution)
-            bestSolutionValue = copy(currentSolutionValue)
+            bestSolutionValue = copy.deepcopy(currentSolutionValue)
 
         keysToPop = []
         for key in tabuList:

@@ -11,19 +11,19 @@ class TestRunner:
     def __init__(self, numOfRepetitions, createSchedule, destination):
         self.numOfRepetitions = numOfRepetitions
         self.createSchedule = createSchedule
-        self.destination = "results/" + destination + "/grafik.xls"
+        self.destination = "results/" + destination +"/"
     
     def printTestRunner(self):
         print("TestRunner num of repetitions: " + str(self.numOfRepetitions)+" algo: " + self.destination)
 
-    def readAvailibility(self):
+    def readAvailibility(self, path):
         availbility = {}
-        for file in os.listdir('input/enough/dataSet1'):
-            data = pd.read_excel('input/enough/dataSet1/'+file, header=0,index_col=0)
+        for file in os.listdir(path):
+            data = pd.read_excel(path+file, header=0,index_col=0)
             availbility.update({file[:-4] : np.array(data)}) 
         return availbility
 
-    def saveSchedule(self, schedule):
+    def saveSchedule(self, schedule, path):
 
         numOfShifts = len(schedule[0])
         colNames = []
@@ -31,7 +31,10 @@ class TestRunner:
             colNames.append("Zmiana " + str(i))
         
         df = pd.DataFrame(schedule, columns = colNames)
-        df.to_excel(self.destination)
+        destPath = self.destination+path
+        if not os.path.exists(destPath):
+                os.makedirs(destPath)
+        df.to_excel(destPath+"/grafik.xls")
 
     def countEmptyShifts(self, schedule):
         numOfEmptyShifts = 0
@@ -65,17 +68,44 @@ class TestRunner:
                 if shift != None:
                     diff[shift] -= 1
         print(diff)
-    
-    def runTest(self):
+
+    def runTest(self, path):
+        durations = []
+        numOfEmptyShiftsArr = []
         for i in range(self.numOfRepetitions):
-            availbility = self.readAvailibility()
+            availbility = self.readAvailibility("input/"+ path + "/")
             start = time.time()
             schedule = self.createSchedule(availbility)
             end = time.time()
             duration = end - start
-            print("elapsed time: " + str(duration) + " Num of empty shifts: " + str(self.countEmptyShifts(schedule)))
-            self.saveSchedule(schedule)
+            emptyShifts = self.countEmptyShifts(schedule)
+            print("elapsed time: " + str(duration) + " Num of empty shifts: " + str(emptyShifts))
+            self.saveSchedule(schedule, path)            
             self.getDifferenceAvailbilityAndSchedule(availbility,schedule)
+            durations.append(duration)
+            numOfEmptyShiftsArr.append(emptyShifts)
+        return (durations, numOfEmptyShiftsArr)
+            
+    
+    def runTests(self):
+        for workersDaysDir in os.listdir("input"):
+            for option in os.listdir("input/"+ workersDaysDir):
+                optionTimes = []
+                optionQuality = []
+                for dataSet in os.listdir("input/"+ workersDaysDir+ "/"+option):
+                    print("input/"+ workersDaysDir+ "/"+option + "/" + dataSet)
+                    results = self.runTest(workersDaysDir+ "/"+option+ "/" + dataSet)
+                    optionTimes.append(results[0])
+                    optionQuality.append(results[1])
+                colnames = list(range(self.numOfRepetitions))
+                rownames = list(os.listdir("input/"+ workersDaysDir+ "/"+option))
+                df = pd.DataFrame(optionTimes, columns = colnames, index= rownames)
+                df = df.T
+                df.to_excel(self.destination + workersDaysDir+ "/"+option+"/time.xls")
+                df2 = pd.DataFrame(optionQuality, columns = colnames, index= rownames)
+                df2 = df2.T
+                df2.to_excel(self.destination+ workersDaysDir+ "/"+option+"/quality.xls")
+
 
 
 def createScheduleWithConstraintProgramming(availability):
@@ -227,17 +257,17 @@ def createScheduleWithLinearProgramming(availability):
 
 def main():
     
-    t = TestRunner(1, createScheduleWithConstraintProgramming, "cp")
+    t = TestRunner(4, createScheduleWithConstraintProgramming, "cp")
     t.printTestRunner()
-    t.runTest()
+    t.runTests()
 
-    t2 = TestRunner(1, createScheduleWithLinearProgramming, "lp")
+    t2 = TestRunner(4, createScheduleWithLinearProgramming, "lp")
     t2.printTestRunner()
-    t2.runTest()
+    t2.runTests()
 
-    t3 = TestRunner(1, tabuSearch, "tabu")
+    t3 = TestRunner(4, tabuSearch, "tabu")
     t3.printTestRunner()
-    t3.runTest()
+    t3.runTests()
    
 if __name__ == '__main__':
     main()
